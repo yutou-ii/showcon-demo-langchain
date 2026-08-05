@@ -66,6 +66,23 @@ Framework: LangGraph (Python)
 Package manager: npm
 ```
 
+如果 CLI 报错包含 `curl 92 HTTP/2`、`early EOF` 或 `invalid index-pack output`，不要继续重试脚手架。改用下面的固定版本部分克隆方案：
+
+```powershell
+Set-Location D:\code\aiagent\0824_langchain\scratch
+New-Item -ItemType Directory -Path copilotkit-source
+Set-Location copilotkit-source
+git init
+git remote add origin https://github.com/CopilotKit/CopilotKit.git
+git sparse-checkout init --cone
+git sparse-checkout set examples/integrations/langgraph-python
+git -c http.version=HTTP/1.1 fetch --depth=1 --filter=blob:none origin 8e59bfd16b415b9f776a4742aa43942a8d02c2ef
+git checkout --detach FETCH_HEAD
+Copy-Item -Path .\examples\integrations\langgraph-python -Destination ..\official-smoke -Recurse
+```
+
+该方案仍使用 CopilotKit CLI 4.7.0 对应的官方模板版本，只减少 GitHub 下载量。`copilotkit-source/` 和 `official-smoke/` 都位于 Git 仓库外；冒烟测试通过前不删除临时源码目录。
+
 - [ ] **步骤 2：找到模板生成的模型配置**
 
 运行：

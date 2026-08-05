@@ -209,6 +209,8 @@ frontend/
 
 在 scratch/ 中运行 CopilotKit 官方 CLI 模板，并对照带教提供的 Agentic Chat 页面。只确认页面、服务、网络和公司模型接口可以连通，不要求理解模板中的 LangGraph 和前端工具代码。
 
+模板版本固定为 CopilotKit CLI 4.7.0 请求的官方提交 `8e59bfd16b415b9f776a4742aa43942a8d02c2ef`。如果 CLI 因 GitHub HTTP/2 下载中断而无法完成脚手架创建，则在 scratch/ 中使用 Git 的部分克隆与稀疏检出，只获取 `examples/integrations/langgraph-python`，再复制为 `official-smoke/`。该回退只替换模板获取方式，不改变模板来源、版本、冒烟目标或正式项目架构；临时源码目录保留到冒烟验证结束，以便排错。
+
 通过条件：模板聊天页面能够收到公司模型回答。
 
 ### 里程碑 1：LangChain 单轮调用
