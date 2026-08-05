@@ -52,7 +52,7 @@
 - IDE：PyCharm。
 - Python：3.12。
 - 虚拟环境：backend/.venv。
-- 当前已检测到 LangChain 1.3.14、LangGraph 1.2.10、langchain-openai 1.4.1、FastAPI 0.141.1、CopilotKit Python SDK 0.1.94 和 ag-ui-langgraph 0.0.42。
+- 当前已检测到 LangChain 1.3.14、LangGraph 1.2.10、langchain-openai 1.4.1、FastAPI 0.141.1 和 ag-ui-langgraph 0.0.42。CopilotKit Python SDK 0.1.94 也已安装，但第一阶段纯聊天不依赖其中的工具中间件。
 - PyCharm 打开 backend 目录，并使用 backend/.venv/Scripts/python.exe 作为项目解释器。
 
 ### 前端
@@ -60,6 +60,7 @@
 - IDE：VS Code。
 - Node.js：20 或更高；当前环境为 Node.js 24.15.0。
 - 包管理器：npm；当前环境为 npm 11.12.1。
+- 首次搭建锁定 create-next-app 16.3.0、CopilotKit 1.66.2、AG-UI client 0.0.57 和 lucide-react 1.28.0，并提交 package-lock.json。
 - VS Code 打开 frontend 目录。
 - Windows PowerShell 禁止运行 npm.ps1 时使用 npm.cmd。
 
@@ -82,7 +83,7 @@
 
 ### 前后端通信
 
-使用 AG-UI。AG-UI 是 CopilotKit 前端和智能体后端之间的事件协议，不负责模型推理。Python 侧使用 CopilotKit SDK 的 LangGraph 适配器和 FastAPI 集成；该 SDK 底层依赖 ag-ui-langgraph，将 LangGraph 的执行和流式输出转换为 CopilotKit 可识别的运行、文本、完成和错误事件。
+使用 AG-UI。AG-UI 是 CopilotKit 前端和智能体后端之间的事件协议，不负责模型推理。Python 侧直接使用 ag-ui-langgraph 的 `LangGraphAgent` 和 FastAPI 端点集成，将 LangGraph 的执行和流式输出转换为 CopilotKit 可识别的运行、文本、完成和错误事件。
 
 前端页面不直接调用模型，也不保存模型密钥。页面先请求同一个 Next.js 应用内的 CopilotKit Runtime 路由，再由该路由连接 Python 智能体端点。这个中间路由是带教所给 `page.tsx` 示例中 `runtimeUrl` 指向但未展示的连接代码。
 
@@ -111,12 +112,12 @@ Next.js / React / CopilotChat
           |
           | /api/copilotkit
           v
-Next.js CopilotKit Runtime
+Next.js CopilotKit Runtime / HttpAgent
           |
           | 连接远程智能体
           v
 Python localhost:8000
-FastAPI / CopilotKit SDK / AG-UI
+FastAPI / ag-ui-langgraph / AG-UI
           |
           v
 LangGraph MessagesState
@@ -133,7 +134,7 @@ LangChain ChatOpenAI
 
 1. 用户在 CopilotKit 聊天框输入消息。
 2. `CopilotChat` 向 Next.js 的 CopilotKit Runtime 路由发送带有会话标识和消息的运行请求。
-3. CopilotKit Runtime 根据智能体名称把请求转发到 Python FastAPI 的远程智能体端点。
+3. CopilotKit Runtime 根据智能体名称，通过 `HttpAgent` 把请求转发到 Python FastAPI 的 AG-UI 端点。
 4. Python 端点通过 AG-UI 适配器把请求交给 LangGraph。
 5. LangGraph 从 MessagesState 读取当前消息并调用 LangChain 模型客户端。
 6. 公司模型接口返回流式文本。
@@ -156,9 +157,12 @@ backend/
 │  ├─ 02_stream_chat.py
 │  └─ 03_minimal_graph.py
 ├─ tests/
+│  ├─ conftest.py
 │  ├─ test_config.py
+│  ├─ test_model.py
+│  ├─ test_agent.py
 │  ├─ test_health.py
-│  └─ test_agent.py
+│  └─ test_ag_ui.py
 ├─ docs/
 ├─ requirements.txt
 ├─ .env.example
@@ -181,7 +185,8 @@ frontend/
 │  └─ app/
 │     ├─ api/
 │     │  └─ copilotkit/
-│     │     └─ route.ts
+│     │     └─ [...path]/
+│     │        └─ route.ts
 │     ├─ layout.tsx
 │     ├─ page.tsx
 │     └─ globals.css
@@ -192,7 +197,7 @@ frontend/
 └─ README.md
 ~~~
 
-- route.ts：创建 CopilotKit Runtime，并把已命名智能体连接到 Python FastAPI 端点。
+- `[...path]/route.ts`：使用 v2 多路由处理器创建 CopilotKit Runtime，并通过 `HttpAgent` 把已命名智能体连接到 Python FastAPI 端点。
 - layout.tsx：提供 Next.js 页面外壳并加载全局样式。
 - page.tsx：作为客户端组件提供 `CopilotKit` 上下文，展示 `CopilotChat`，并配置 Runtime 地址、智能体名称和清空交互。
 - globals.css：负责页面布局及 CopilotKit 组件样式。
@@ -226,7 +231,7 @@ frontend/
 
 ### 里程碑 4：FastAPI 和 AG-UI
 
-提供健康检查、CORS，并使用 CopilotKit Python SDK 将 LangGraph 暴露为 AG-UI 智能体端点。
+提供健康检查、CORS，并使用 ag-ui-langgraph 将 LangGraph 暴露为 AG-UI 智能体端点。
 
 通过条件：/health 返回成功，智能体端点产生正确的 AG-UI 流式事件。
 
