@@ -52,7 +52,7 @@
 - IDE：PyCharm。
 - Python：3.12。
 - 虚拟环境：backend/.venv。
-- 当前已检测到 LangChain 1.3.14、LangGraph 1.2.10、langchain-openai 1.4.1、FastAPI 0.141.1 和 ag-ui-langgraph 0.0.42。
+- 当前已检测到 LangChain 1.3.14、LangGraph 1.2.10、langchain-openai 1.4.1、FastAPI 0.141.1、CopilotKit Python SDK 0.1.94 和 ag-ui-langgraph 0.0.42。
 - PyCharm 打开 backend 目录，并使用 backend/.venv/Scripts/python.exe 作为项目解释器。
 
 ### 前端
@@ -82,18 +82,41 @@
 
 ### 前后端通信
 
-使用 AG-UI。AG-UI 是 CopilotKit 前端和智能体后端之间的事件协议，不负责模型推理。ag-ui-langgraph 将 LangGraph 的执行和流式输出转换为 CopilotKit 可识别的运行、文本、完成和错误事件。
+使用 AG-UI。AG-UI 是 CopilotKit 前端和智能体后端之间的事件协议，不负责模型推理。Python 侧使用 CopilotKit SDK 的 LangGraph 适配器和 FastAPI 集成；该 SDK 底层依赖 ag-ui-langgraph，将 LangGraph 的执行和流式输出转换为 CopilotKit 可识别的运行、文本、完成和错误事件。
 
-## 6. 总体架构
+前端页面不直接调用模型，也不保存模型密钥。页面先请求同一个 Next.js 应用内的 CopilotKit Runtime 路由，再由该路由连接 Python 智能体端点。这个中间路由是带教所给 `page.tsx` 示例中 `runtimeUrl` 指向但未展示的连接代码。
+
+## 6. 带教参考示例的使用边界
+
+参考页面：[CopilotKit Agentic Chat（LangGraph + FastAPI）](https://feature-viewer.copilotkit.ai/langgraph-fastapi/feature/agentic_chat?file=page.tsx)。该页面是功能片段查看器，只展示核心的 `page.tsx` 和 `agent.py`，没有展示完整项目目录、Next.js Runtime 路由、FastAPI 挂载代码和环境变量配置，因此用于对照关键 API，不作为可以整段复制运行的完整模板。
+
+| 示例内容 | 第一阶段处理 | 原因 |
+| --- | --- | --- |
+| `CopilotKit`、`runtimeUrl` 和智能体名称 | 保留 | 建立页面到 CopilotKit Runtime 的连接 |
+| `CopilotChat` | 保留 | 提供现成聊天窗口和流式消息展示 |
+| Python `create_agent` / LangGraph 图 | 学完 LangChain 基础后再接入 | 它属于 LangChain 新版智能体 API，底层使用 LangGraph |
+| `MemorySaver` 或等价内存检查点 | 保留 | 支持当前进程内的多轮上下文 |
+| `CopilotKitState`、`CopilotKitMiddleware` | 第一阶段不使用，第二阶段按工具需求引入 | 示例使用它们是为了让前端工具被智能体发现；纯聊天使用标准 `MessagesState` 即可 |
+| `useFrontendTool` 改变背景 | 第二阶段再做 | 这是前端工具调用，不属于第一阶段纯聊天 |
+| `useRenderTool` 天气卡片 | 第二阶段再做 | 这是工具结果的自定义 UI |
+| `useAgentContext`、`useConfigureSuggestions`、Zod 工具参数 | 第二阶段再做 | 属于工具上下文、建议问题和参数校验能力 |
+
+第一阶段不会直接从 `create_agent` 起步。学习顺序仍然是：先用 `ChatOpenAI` 理解 LangChain 单轮调用和流式多轮消息，再把相同模型调用包装成最小 LangGraph，最后接入 CopilotKit。官方示例作为每个里程碑完成后的对照答案，而不是起点。
+
+## 7. 总体架构
 
 ~~~text
 浏览器 localhost:3000
-Next.js / React / CopilotKit
+Next.js / React / CopilotChat
           |
-          | AG-UI 事件流
+          | /api/copilotkit
+          v
+Next.js CopilotKit Runtime
+          |
+          | 连接远程智能体
           v
 Python localhost:8000
-FastAPI / ag-ui-langgraph
+FastAPI / CopilotKit SDK / AG-UI
           |
           v
 LangGraph MessagesState
@@ -109,15 +132,15 @@ LangChain ChatOpenAI
 一次对话的数据流：
 
 1. 用户在 CopilotKit 聊天框输入消息。
-2. 前端创建带有会话标识和消息的智能体运行请求。
-3. AG-UI 端点把请求交给 LangGraph。
-4. LangGraph 从 MessagesState 读取当前消息并调用 LangChain 模型客户端。
-5. 公司模型接口返回流式文本。
-6. 后端将文本转换为 AG-UI 增量事件。
-7. CopilotKit 边接收边更新助手消息。
-8. 运行结束事件关闭当前加载状态。
+2. `CopilotChat` 向 Next.js 的 CopilotKit Runtime 路由发送带有会话标识和消息的运行请求。
+3. CopilotKit Runtime 根据智能体名称把请求转发到 Python FastAPI 的远程智能体端点。
+4. Python 端点通过 AG-UI 适配器把请求交给 LangGraph。
+5. LangGraph 从 MessagesState 读取当前消息并调用 LangChain 模型客户端。
+6. 公司模型接口返回流式文本。
+7. Python 后端将文本转换为 AG-UI 增量事件并沿原链路返回。
+8. `CopilotChat` 边接收边更新助手消息，运行结束事件关闭当前加载状态。
 
-## 7. 组件边界
+## 8. 组件边界
 
 ### 后端正式代码
 
@@ -156,6 +179,9 @@ backend/
 frontend/
 ├─ src/
 │  └─ app/
+│     ├─ api/
+│     │  └─ copilotkit/
+│     │     └─ route.ts
 │     ├─ layout.tsx
 │     ├─ page.tsx
 │     └─ globals.css
@@ -166,16 +192,17 @@ frontend/
 └─ README.md
 ~~~
 
-- layout.tsx：加载全局样式并提供 CopilotKit 上下文。
-- page.tsx：展示聊天窗口，配置智能体名称、欢迎文案和清空交互。
+- route.ts：创建 CopilotKit Runtime，并把已命名智能体连接到 Python FastAPI 端点。
+- layout.tsx：提供 Next.js 页面外壳并加载全局样式。
+- page.tsx：作为客户端组件提供 `CopilotKit` 上下文，展示 `CopilotChat`，并配置 Runtime 地址、智能体名称和清空交互。
 - globals.css：负责页面布局及 CopilotKit 组件样式。
 - .env.local.example：说明本地 Python 智能体地址，不包含密钥。
 
-## 8. 学习和实施顺序
+## 9. 学习和实施顺序
 
 ### 里程碑 0：官方模板冒烟验证
 
-在 scratch/ 中运行 CopilotKit 官方 CLI 模板。只确认页面、服务、网络和公司模型接口可以连通，不要求理解模板中的 LangGraph 代码。
+在 scratch/ 中运行 CopilotKit 官方 CLI 模板，并对照带教提供的 Agentic Chat 页面。只确认页面、服务、网络和公司模型接口可以连通，不要求理解模板中的 LangGraph 和前端工具代码。
 
 通过条件：模板聊天页面能够收到公司模型回答。
 
@@ -199,13 +226,13 @@ frontend/
 
 ### 里程碑 4：FastAPI 和 AG-UI
 
-提供健康检查、CORS 和 AG-UI 智能体端点。
+提供健康检查、CORS，并使用 CopilotKit Python SDK 将 LangGraph 暴露为 AG-UI 智能体端点。
 
 通过条件：/health 返回成功，智能体端点产生正确的 AG-UI 流式事件。
 
 ### 里程碑 5：CopilotKit 前端
 
-手动创建 Next.js/CopilotKit 页面并连接 Python 后端。
+手动创建 Next.js/CopilotKit 页面和 CopilotKit Runtime 路由，再连接 Python 后端。
 
 通过条件：可以发送消息、流式显示回答、清空会话并显示错误。
 
@@ -217,7 +244,7 @@ frontend/
 
 上一里程碑没有通过时，不同时修改下一层。
 
-## 9. 会话状态
+## 10. 会话状态
 
 第一阶段只提供进程内记忆：
 
@@ -227,7 +254,7 @@ frontend/
 - 后端重启后历史消失，这是第一阶段的预期行为。
 - 不使用数据库，不承诺跨设备或跨进程恢复。
 
-## 10. 配置与安全
+## 11. 配置与安全
 
 后端真实 .env 包含：
 
@@ -246,7 +273,7 @@ OPENAI_MODEL=company-model-name
 - 缺少必需配置时后端启动应快速失败，并明确指出缺少的变量名。
 - /health 只表示 Web 服务存活，不调用模型，也不消耗额度。
 
-## 11. 错误处理
+## 12. 错误处理
 
 - 配置错误：启动时给出明确的缺失变量提示。
 - 模型接口错误：转换为可理解的智能体运行错误，不向前端暴露密钥或底层鉴权信息。
@@ -254,7 +281,7 @@ OPENAI_MODEL=company-model-name
 - 前端连接失败：提示确认 Python 服务地址和 /health。
 - 流式响应中断：保留已显示文本，同时明确标记回答未完成。
 
-## 12. 测试与验收
+## 13. 测试与验收
 
 ### 自动测试
 
@@ -264,6 +291,7 @@ OPENAI_MODEL=company-model-name
 - 假模型输入消息后，图返回助手消息。
 - 相同 thread_id 保留上下文。
 - 不同 thread_id 不共享上下文。
+- CopilotKit Runtime 能发现并连接配置的 Python 智能体。
 - 前端构建和静态检查通过。
 
 ### 人工端到端验收
@@ -277,7 +305,7 @@ OPENAI_MODEL=company-model-name
 7. 恢复后端，确认可以重新发送消息。
 8. 检查 Git 状态，确认 .env、.idea/、.vscode/ 和 .venv/ 未被跟踪。
 
-## 13. 第二阶段扩展边界
+## 14. 第二阶段扩展边界
 
 第二阶段在 LangGraph 中增加 skill 或工具执行节点，而不是改写前端通信链路。AG-UI 可继续承载工具调用开始、参数、结果、失败和完成事件；CopilotKit 可以为这些事件增加过程展示。
 
@@ -289,5 +317,7 @@ OPENAI_MODEL=company-model-name
 - 超时、取消和失败恢复。
 - 工具结果的前端展示。
 - 日志、审计和敏感信息处理。
+
+带教示例中的 `useFrontendTool`、`useRenderTool`、`useAgentContext`、`useConfigureSuggestions` 和 Zod 参数结构可以作为第二阶段的直接参考；第二阶段仍需先定义具体 skill 契约，再决定哪些结果只显示文本、哪些结果使用自定义卡片。
 
 这些内容不提前放入第一阶段代码。
