@@ -1,48 +1,63 @@
-# Local Chat Agent Phase One Implementation Plan
+# 本地对话智能体第一阶段实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给执行本计划的 Agent：** 必须使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans`，按任务逐项实施。每个步骤使用复选框（`- [ ]`）跟踪进度。
 
-**Goal:** Build a local, streaming, multi-turn chat agent with a CopilotKit/Next.js frontend and a Python FastAPI/LangChain/LangGraph backend connected to the company's OpenAI-compatible endpoint.
+**目标：** 构建一个可在本地运行、支持流式输出和多轮对话的简单智能体。前端使用 CopilotKit/Next.js，后端使用 Python FastAPI/LangChain/LangGraph，并连接公司的 OpenAI 兼容接口。
 
-**Architecture:** `CopilotChat` calls a same-origin CopilotKit Runtime route in Next.js. The runtime registers an AG-UI `HttpAgent` that forwards runs to the Python FastAPI endpoint; `ag-ui-langgraph` adapts those runs to a one-node LangGraph backed by LangChain `ChatOpenAI` and an in-memory checkpointer.
+**架构：** 浏览器中的 `CopilotChat` 调用 Next.js 提供的同源 CopilotKit Runtime 路由。Runtime 注册一个遵循 AG-UI 协议的 `HttpAgent`，把每次对话请求转发给 Python FastAPI；`ag-ui-langgraph` 再把请求适配到只有一个模型节点的 LangGraph。模型由 LangChain 的 `ChatOpenAI` 调用，短期对话记录由内存检查点（in-memory checkpointer）保存。
 
-**Tech Stack:** Next.js 16.3.0, React, TypeScript, CopilotKit 1.66.2 with its v2 APIs, AG-UI client 0.0.57, Python 3.12, FastAPI, LangChain 1.3.14, LangGraph 1.2.10, langchain-openai 1.4.1, ag-ui-langgraph 0.0.42, pytest.
+**技术栈：** Next.js 16.3.0、React、TypeScript、CopilotKit 1.66.2（使用 v2 API）、AG-UI client 0.0.57、Python 3.12、FastAPI、LangChain 1.3.14、LangGraph 1.2.10、langchain-openai 1.4.1、ag-ui-langgraph 0.0.42、pytest。
 
-## Global Constraints
+## 全局约束
 
-- Backend repository: `D:\code\aiagent\0824_langchain\backend`; develop it in PyCharm with `backend\.venv\Scripts\python.exe`.
-- Frontend repository: `D:\code\aiagent\0824_langchain\frontend`; develop it in VS Code with Node.js 20+ and npm.
-- On Windows PowerShell, use `npm.cmd` and `npx.cmd` if script execution policy blocks `npm.ps1` or `npx.ps1`.
-- Pin scaffolding to `create-next-app@16.3.0`, `@copilotkit/react-core@1.66.2`, `@copilotkit/runtime@1.66.2`, `@ag-ui/client@0.0.57`, and `lucide-react@1.28.0`; commit `package-lock.json`.
-- Agent ID is exactly `local_chat` in Python, the Next.js runtime, and `CopilotChat`.
-- Python AG-UI endpoint is `http://127.0.0.1:8000/agent`; health endpoint is `http://127.0.0.1:8000/health`.
-- Next.js runtime base path is `/api/copilotkit`; use the v2 catch-all route `src/app/api/copilotkit/[...path]/route.ts`.
-- The model API key exists only in `backend/.env`; never place it in frontend files or commit it.
-- First phase includes streaming, process-local multi-turn context, new-chat reset, loading/error feedback, `/health`, tests, and documentation.
-- First phase excludes skills/tools, RAG, databases, authentication, persistent history, multi-agent flows, and production deployment.
-- Keep the GitHub-generated initial README commits in history; replace README contents through ordinary commits and do not force-push.
+- 后端仓库：`D:\code\aiagent\0824_langchain\backend`；在 PyCharm 中开发，并使用解释器 `backend\.venv\Scripts\python.exe`。
+- 前端仓库：`D:\code\aiagent\0824_langchain\frontend`；在 VS Code 中开发，使用 Node.js 20+ 和 npm。
+- 在 Windows PowerShell 中，如果执行策略阻止运行 `npm.ps1` 或 `npx.ps1`，改用 `npm.cmd` 和 `npx.cmd`。
+- 固定脚手架和依赖版本：`create-next-app@16.3.0`、`@copilotkit/react-core@1.66.2`、`@copilotkit/runtime@1.66.2`、`@ag-ui/client@0.0.57`、`lucide-react@1.28.0`；必须提交 `package-lock.json`。
+- Python、Next.js Runtime 和 `CopilotChat` 中的 Agent ID 必须完全一致，统一为 `local_chat`。
+- Python AG-UI 地址固定为 `http://127.0.0.1:8000/agent`；健康检查地址固定为 `http://127.0.0.1:8000/health`。
+- Next.js Runtime 的基础路径为 `/api/copilotkit`；使用 v2 通配路由 `src/app/api/copilotkit/[...path]/route.ts`。
+- 模型 API Key 只能保存在 `backend/.env`，严禁写入前端文件或提交到 Git。
+- 第一阶段包含：流式输出、进程内多轮上下文、新建对话、加载和错误反馈、`/health`、测试及文档。
+- 第一阶段不包含：skills/tools、RAG、数据库、鉴权、历史记录持久化、多智能体流程及生产部署。
+- 保留 GitHub 自动生成 README 的初始提交历史；通过普通提交覆盖 README 内容，不得强制推送。
+
+## 新手执行说明
+
+这份计划不是要求你一次写完全部代码，而是按下面的学习顺序逐层增加能力：
+
+1. **任务 1：先确认环境可用。** 官方模板只做冒烟测试，目的是先证明公司模型接口和本机环境能够跑通。
+2. **任务 2-3：只学习 LangChain。** 先理解环境变量、`ChatOpenAI`、单轮调用、流式输出和手动维护消息历史。
+3. **任务 4：再引入 LangGraph。** 把任务 3 已经理解的模型调用放进一个最小图中，只增加 `thread_id` 和上下文保存能力。
+4. **任务 5：把 Python 能力变成 HTTP 服务。** FastAPI 提供服务入口，AG-UI 负责统一前后端之间的 Agent 事件格式。
+5. **任务 6-8：接入前端。** 先生成干净的 Next.js 项目，再依次加入 Runtime 代理和 `CopilotChat` 页面。
+6. **任务 9：统一验收。** 最后才使用真实模型检查流式输出、多轮记忆、清空会话、错误恢复和文档。
+
+任务 2-5 使用测试驱动开发（TDD）的“红、绿”循环：先写测试并看到它因为功能不存在而失败（红），再写最少实现让测试通过（绿）。这里的首次失败是计划的一部分，不代表操作出错。
+
+每完成一个任务就停下来检查该任务的预期结果并提交 Git。某一步的实际结果与“预期结果”不一致时，不要继续后面的任务；先记录命令、完整报错和当前任务编号，再定位当前这一层的问题。
 
 ---
 
-### Task 1: Run the Official Starter as a Disposable Smoke Test
+### 任务 1：运行官方模板，完成一次性冒烟测试
 
-**Files:**
-- Create outside Git: `D:\code\aiagent\0824_langchain\scratch\official-smoke\`
-- Do not modify either formal repository.
+**涉及文件：**
+- 在 Git 仓库外创建：`D:\code\aiagent\0824_langchain\scratch\official-smoke\`
+- 不修改前端和后端两个正式仓库。
 
-**Interfaces:**
-- Consumes: Company `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` values.
-- Produces: Proof that Node, Python, the browser, and the company model endpoint can complete one CopilotKit chat run.
+**输入与产出：**
+- 输入：公司提供的 `OPENAI_API_KEY`、`OPENAI_BASE_URL` 和 `OPENAI_MODEL`。
+- 产出：验证 Node、Python、浏览器和公司模型接口能够共同完成一次 CopilotKit 对话。
 
-- [ ] **Step 1: Generate the official starter**
+- [ ] **步骤 1：生成官方模板项目**
 
-Run from `D:\code\aiagent\0824_langchain\scratch`:
+在 `D:\code\aiagent\0824_langchain\scratch` 目录运行：
 
 ```powershell
 npx.cmd copilotkit@latest create
 ```
 
-Choose these answers:
+按照下面的选项回答脚手架问题：
 
 ```text
 Project name: official-smoke
@@ -51,20 +66,20 @@ Framework: LangGraph (Python)
 Package manager: npm
 ```
 
-- [ ] **Step 2: Locate the generated model configuration**
+- [ ] **步骤 2：找到模板生成的模型配置**
 
-Run:
+运行：
 
 ```powershell
 Set-Location D:\code\aiagent\0824_langchain\scratch\official-smoke
 rg -n "create_agent|ChatOpenAI|OPENAI_API_KEY|gpt-" .
 ```
 
-Expected: at least one Python agent file and one environment example are listed. Record their paths in a temporary note outside Git; the CLI layout may change between releases.
+预期结果：至少找到一个 Python Agent 文件和一个环境变量示例文件。把路径临时记录在 Git 仓库外，因为 CLI 在不同版本中可能生成不同的目录结构。
 
-- [ ] **Step 3: Configure the disposable agent for the company endpoint**
+- [ ] **步骤 3：让临时 Agent 使用公司的模型接口**
 
-In the generated Python agent file, instantiate the model explicitly and pass it to the generated graph or `create_agent` call:
+在生成的 Python Agent 文件中显式创建模型，并把它传给模板生成的图或 `create_agent` 调用：
 
 ```python
 import os
@@ -79,43 +94,43 @@ model = ChatOpenAI(
 )
 ```
 
-Set the three real values only in the generated local `.env` file. Do not paste them into source files or terminal output.
+三个真实值只能写入本地生成的 `.env` 文件。不要把它们粘贴到源码或终端输出中。
 
-- [ ] **Step 4: Start the starter and verify one answer**
+- [ ] **步骤 4：启动模板并验证一次回复**
 
-Run:
+运行：
 
 ```powershell
 npm.cmd install
 npm.cmd run dev
 ```
 
-Expected: both UI and agent services start. Open the printed local URL, send `你好，请只回复“连接成功”`, and confirm the answer arrives.
+预期结果：前端界面和 Agent 服务都成功启动。打开终端打印的本地地址，发送 `你好，请只回复“连接成功”`，确认能够收到回复。
 
-- [ ] **Step 5: Stop and preserve the smoke test only as local reference**
+- [ ] **步骤 5：停止服务，只把模板保留为本地参考**
 
-Press `Ctrl+C`. Do not initialize Git or copy generated files into the formal repositories. If the smoke test fails, stop here and diagnose the failing layer before starting Task 2.
+按 `Ctrl+C` 停止服务。不要初始化 Git，也不要把生成的文件复制进正式仓库。如果冒烟测试失败，就暂时停在这里，先判断问题出在 Node、Python、浏览器还是公司模型接口；修复后再开始任务 2。
 
 ---
 
-### Task 2: Establish Backend Dependencies and Validated Settings
+### 任务 2：建立后端依赖和经过校验的配置
 
-**Files:**
-- Create: `requirements.txt`
-- Create: `requirements-dev.txt`
-- Create: `.env.example`
-- Create: `app/__init__.py`
-- Create: `app/config.py`
-- Create: `tests/test_config.py`
-- Modify: `.gitignore`
+**涉及文件：**
+- 新建：`requirements.txt`
+- 新建：`requirements-dev.txt`
+- 新建：`.env.example`
+- 新建：`app/__init__.py`
+- 新建：`app/config.py`
+- 新建：`tests/test_config.py`
+- 修改：`.gitignore`
 
-**Interfaces:**
-- Consumes: Environment variables `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL`.
-- Produces: `Settings`, `get_settings() -> Settings`, and a reproducible Python dependency set.
+**输入与产出：**
+- 输入：环境变量 `OPENAI_API_KEY`、`OPENAI_BASE_URL` 和 `OPENAI_MODEL`。
+- 产出：`Settings`、`get_settings() -> Settings`，以及可重复安装的 Python 依赖集合。
 
-- [ ] **Step 1: Declare runtime and test dependencies**
+- [ ] **步骤 1：声明运行依赖和测试依赖**
 
-Create `requirements.txt`:
+新建 `requirements.txt`：
 
 ```text
 ag-ui-langgraph==0.0.42
@@ -127,7 +142,7 @@ pydantic-settings>=2.0,<3.0
 uvicorn[standard]==0.52.1
 ```
 
-Create `requirements-dev.txt`:
+新建 `requirements-dev.txt`：
 
 ```text
 -r requirements.txt
@@ -136,15 +151,15 @@ pytest>=8.0,<9.0
 pytest-asyncio>=0.25,<2.0
 ```
 
-Run:
+运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 ```
 
-- [ ] **Step 2: Write failing settings tests**
+- [ ] **步骤 2：先编写会失败的配置测试**
 
-Create `tests/test_config.py`:
+新建 `tests/test_config.py`：
 
 ```python
 import pytest
@@ -186,19 +201,19 @@ def test_settings_name_each_missing_variable(
     assert missing_name in str(error.value)
 ```
 
-- [ ] **Step 3: Run the tests and confirm they fail**
+- [ ] **步骤 3：运行测试并确认它按预期失败**
 
-Run:
+运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_config.py -v
 ```
 
-Expected: collection fails because `app.config` does not exist.
+预期结果：测试收集阶段失败，原因是 `app.config` 还不存在。这次失败证明测试确实能发现尚未实现的功能。
 
-- [ ] **Step 4: Implement validated settings**
+- [ ] **步骤 4：实现带校验的配置类**
 
-Create an empty `app/__init__.py`, then create `app/config.py`:
+先新建空文件 `app/__init__.py`，再新建 `app/config.py`：
 
 ```python
 from functools import lru_cache
@@ -224,7 +239,7 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-Create `.env.example`:
+新建 `.env.example`：
 
 ```dotenv
 OPENAI_API_KEY=change-me
@@ -232,7 +247,7 @@ OPENAI_BASE_URL=https://company-endpoint.example/v1
 OPENAI_MODEL=company-model-name
 ```
 
-Confirm `.gitignore` contains these rules:
+确认 `.gitignore` 包含以下规则：
 
 ```gitignore
 .env
@@ -240,18 +255,18 @@ Confirm `.gitignore` contains these rules:
 !.env.example
 ```
 
-- [ ] **Step 5: Run the focused and full backend tests**
+- [ ] **步骤 5：运行当前测试和全部后端测试**
 
-Run:
+运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_config.py -v
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected: all tests pass.
+预期结果：全部测试通过。
 
-- [ ] **Step 6: Commit the backend foundation**
+- [ ] **步骤 6：提交后端基础配置**
 
 ```powershell
 git add requirements.txt requirements-dev.txt .env.example .gitignore app tests
@@ -260,21 +275,21 @@ git commit -m "build: add backend settings and dependencies"
 
 ---
 
-### Task 3: Add the LangChain Model Factory and Learning Examples
+### 任务 3：添加 LangChain 模型工厂和学习示例
 
-**Files:**
-- Create: `app/model.py`
-- Create: `examples/01_model_call.py`
-- Create: `examples/02_stream_chat.py`
-- Create: `tests/test_model.py`
+**涉及文件：**
+- 新建：`app/model.py`
+- 新建：`examples/01_model_call.py`
+- 新建：`examples/02_stream_chat.py`
+- 新建：`tests/test_model.py`
 
-**Interfaces:**
-- Consumes: `Settings` from Task 2.
-- Produces: `create_chat_model(settings: Settings | None = None) -> ChatOpenAI` and two terminal learning programs.
+**输入与产出：**
+- 输入：任务 2 创建的 `Settings`。
+- 产出：`create_chat_model(settings: Settings | None = None) -> ChatOpenAI`，以及两个可在终端运行的学习程序。
 
-- [ ] **Step 1: Write the failing model factory test**
+- [ ] **步骤 1：先编写会失败的模型工厂测试**
 
-Create `tests/test_model.py`:
+新建 `tests/test_model.py`：
 
 ```python
 from pydantic import SecretStr
@@ -298,17 +313,17 @@ def test_create_chat_model_uses_company_endpoint_settings() -> None:
     assert model.streaming is True
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails**
+- [ ] **步骤 2：运行测试并确认它按预期失败**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_model.py -v
 ```
 
-Expected: FAIL because `app.model` does not exist.
+预期结果：测试失败，因为 `app.model` 还不存在。
 
-- [ ] **Step 3: Implement the model factory**
+- [ ] **步骤 3：实现模型工厂**
 
-Create `app/model.py`:
+新建 `app/model.py`：
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -328,15 +343,15 @@ def create_chat_model(settings: Settings | None = None) -> ChatOpenAI:
     )
 ```
 
-- [ ] **Step 4: Run the test and confirm it passes**
+- [ ] **步骤 4：运行测试并确认它通过**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_model.py -v
 ```
 
-- [ ] **Step 5: Add the single-turn learning example**
+- [ ] **步骤 5：添加单轮模型调用学习示例**
 
-Create `examples/01_model_call.py`:
+新建 `examples/01_model_call.py`：
 
 ```python
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -359,17 +374,17 @@ if __name__ == "__main__":
     main()
 ```
 
-Run with a real local `.env`:
+准备好包含真实配置的本地 `.env` 后运行：
 
 ```powershell
 .\.venv\Scripts\python.exe examples\01_model_call.py
 ```
 
-Expected: one complete model answer is printed.
+预期结果：终端一次性打印一条完整的模型回答。这个示例先帮助你理解最基础的 `model.invoke()`。
 
-- [ ] **Step 6: Add the streaming multi-turn learning example**
+- [ ] **步骤 6：添加流式多轮对话学习示例**
 
-Create `examples/02_stream_chat.py`:
+新建 `examples/02_stream_chat.py`：
 
 ```python
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -405,15 +420,15 @@ if __name__ == "__main__":
     main()
 ```
 
-Run:
+运行：
 
 ```powershell
 .\.venv\Scripts\python.exe examples\02_stream_chat.py
 ```
 
-Send `记住我的名字叫小羽` and then `我的名字是什么？`. Expected: text appears incrementally and the second answer uses the first turn.
+先发送 `记住我的名字叫小羽`，再发送 `我的名字是什么？`。预期结果：文字逐段出现，而且第二次回答能够利用第一轮的内容。这里的 `history` 就是最直观的多轮上下文。
 
-- [ ] **Step 7: Run all tests and commit**
+- [ ] **步骤 7：运行全部测试并提交**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
@@ -423,20 +438,20 @@ git commit -m "feat: add LangChain model and chat examples"
 
 ---
 
-### Task 4: Build the Minimal Stateful LangGraph
+### 任务 4：构建最小的有状态 LangGraph
 
-**Files:**
-- Create: `app/agent.py`
-- Create: `examples/03_minimal_graph.py`
-- Create: `tests/test_agent.py`
+**涉及文件：**
+- 新建：`app/agent.py`
+- 新建：`examples/03_minimal_graph.py`
+- 新建：`tests/test_agent.py`
 
-**Interfaces:**
-- Consumes: any `BaseChatModel` and optional LangGraph checkpointer.
-- Produces: `build_chat_graph(model, checkpointer=None) -> CompiledStateGraph` with a single `model` node and process-local thread isolation.
+**输入与产出：**
+- 输入：任意 `BaseChatModel`，以及可选的 LangGraph checkpointer（检查点保存器）。
+- 产出：`build_chat_graph(model, checkpointer=None) -> CompiledStateGraph`。图中只有一个 `model` 节点，不同 `thread_id` 的对话在当前进程内彼此隔离。
 
-- [ ] **Step 1: Write failing graph memory tests**
+- [ ] **步骤 1：先编写会失败的图记忆测试**
 
-Create `tests/test_agent.py`:
+新建 `tests/test_agent.py`：
 
 ```python
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
@@ -481,17 +496,17 @@ def test_different_threads_do_not_share_messages() -> None:
     ]
 ```
 
-- [ ] **Step 2: Run the tests and confirm they fail**
+- [ ] **步骤 2：运行测试并确认它按预期失败**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_agent.py -v
 ```
 
-Expected: FAIL because `build_chat_graph` does not exist.
+预期结果：测试失败，因为 `build_chat_graph` 还不存在。
 
-- [ ] **Step 3: Implement the one-node graph**
+- [ ] **步骤 3：实现只有一个节点的图**
 
-Create `app/agent.py`:
+新建 `app/agent.py`：
 
 ```python
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -522,17 +537,17 @@ def build_chat_graph(
     return builder.compile(checkpointer=checkpointer or MemorySaver())
 ```
 
-- [ ] **Step 4: Run the graph tests**
+- [ ] **步骤 4：运行图相关测试**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_agent.py -v
 ```
 
-Expected: both tests pass.
+预期结果：两个测试都通过。第一个测试证明同一 `thread_id` 会保留上下文，第二个测试证明不同 `thread_id` 不会串话。
 
-- [ ] **Step 5: Add the educational graph streaming example**
+- [ ] **步骤 5：添加用于学习的图流式输出示例**
 
-Create `examples/03_minimal_graph.py`:
+新建 `examples/03_minimal_graph.py`：
 
 ```python
 from langchain_core.messages import AIMessageChunk, HumanMessage
@@ -567,9 +582,9 @@ if __name__ == "__main__":
     main()
 ```
 
-Run it and repeat the two-turn name check from Task 3.
+运行该示例，并重复任务 3 中的两轮姓名测试。注意这次消息历史不再由示例代码手动维护，而是交给 LangGraph 的 checkpointer。
 
-- [ ] **Step 6: Run all tests and commit**
+- [ ] **步骤 6：运行全部测试并提交**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
@@ -579,21 +594,21 @@ git commit -m "feat: add minimal stateful LangGraph agent"
 
 ---
 
-### Task 5: Expose the Graph through FastAPI and AG-UI
+### 任务 5：通过 FastAPI 和 AG-UI 暴露 LangGraph 服务
 
-**Files:**
-- Create: `app/main.py`
-- Create: `tests/conftest.py`
-- Create: `tests/test_health.py`
-- Create: `tests/test_ag_ui.py`
+**涉及文件：**
+- 新建：`app/main.py`
+- 新建：`tests/conftest.py`
+- 新建：`tests/test_health.py`
+- 新建：`tests/test_ag_ui.py`
 
-**Interfaces:**
-- Consumes: `build_chat_graph()` and `create_chat_model()`.
-- Produces: `create_app(model=None) -> FastAPI`, module-level `app`, `GET /health`, `POST /agent`, and `GET /agent/health`.
+**输入与产出：**
+- 输入：`build_chat_graph()` 和 `create_chat_model()`。
+- 产出：`create_app(model=None) -> FastAPI`、模块级 `app`、`GET /health`、`POST /agent` 和 `GET /agent/health`。
 
-- [ ] **Step 1: Supply non-secret test environment defaults**
+- [ ] **步骤 1：为测试提供不含秘密的环境变量默认值**
 
-Create `tests/conftest.py`:
+新建 `tests/conftest.py`：
 
 ```python
 import os
@@ -604,9 +619,9 @@ os.environ.setdefault("OPENAI_BASE_URL", "https://models.example.test/v1")
 os.environ.setdefault("OPENAI_MODEL", "test-model")
 ```
 
-- [ ] **Step 2: Write failing health and CORS tests**
+- [ ] **步骤 2：先编写会失败的健康检查和 CORS 测试**
 
-Create `tests/test_health.py`:
+新建 `tests/test_health.py`：
 
 ```python
 from fastapi.testclient import TestClient
@@ -639,9 +654,9 @@ def test_local_frontend_origin_is_allowed() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 ```
 
-- [ ] **Step 3: Write the failing AG-UI stream test**
+- [ ] **步骤 3：编写会失败的 AG-UI 流式响应测试**
 
-Create `tests/test_ag_ui.py`:
+新建 `tests/test_ag_ui.py`：
 
 ```python
 from fastapi.testclient import TestClient
@@ -673,17 +688,17 @@ def test_agent_endpoint_streams_ag_ui_events() -> None:
     assert "hello" in body
 ```
 
-- [ ] **Step 4: Run the tests and confirm they fail**
+- [ ] **步骤 4：运行测试并确认它按预期失败**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_health.py tests\test_ag_ui.py -v
 ```
 
-Expected: FAIL because `app.main` does not exist.
+预期结果：测试失败，因为 `app.main` 还不存在。
 
-- [ ] **Step 5: Implement the FastAPI application**
+- [ ] **步骤 5：实现 FastAPI 应用**
 
-Create `app/main.py`:
+新建 `app/main.py`：
 
 ```python
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
@@ -727,18 +742,18 @@ def create_app(model: BaseChatModel | None = None) -> FastAPI:
 app = create_app()
 ```
 
-- [ ] **Step 6: Run focused and full tests**
+- [ ] **步骤 6：运行当前测试和全部测试**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_health.py tests\test_ag_ui.py -v
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected: all tests pass without calling a real model.
+预期结果：所有测试通过，而且不会调用真实模型接口。测试使用 `FakeListChatModel`，因此不会消耗公司接口额度。
 
-- [ ] **Step 7: Start the backend in PyCharm and probe it**
+- [ ] **步骤 7：在 PyCharm 中启动并检查后端**
 
-Create a PyCharm Python run configuration with:
+在 PyCharm 中创建 Python 运行配置：
 
 ```text
 Module name: uvicorn
@@ -747,16 +762,16 @@ Working directory: D:\code\aiagent\0824_langchain\backend
 Interpreter: D:\code\aiagent\0824_langchain\backend\.venv\Scripts\python.exe
 ```
 
-With the real `backend/.env` present, start it and run:
+确认真实的 `backend/.env` 已存在，启动服务后运行：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
 Invoke-RestMethod http://127.0.0.1:8000/agent/health
 ```
 
-Expected: both return `status: ok`; the second response also names `local_chat`.
+预期结果：两个地址都返回 `status: ok`；第二个响应还会显示 Agent 名称 `local_chat`。
 
-- [ ] **Step 8: Commit the backend service**
+- [ ] **步骤 8：提交后端服务**
 
 ```powershell
 git add app\main.py tests\conftest.py tests\test_health.py tests\test_ag_ui.py
@@ -765,22 +780,22 @@ git commit -m "feat: expose chat agent over FastAPI and AG-UI"
 
 ---
 
-### Task 6: Clone and Scaffold the Formal Next.js Frontend
+### 任务 6：克隆正式前端仓库并生成 Next.js 脚手架
 
-**Files:**
-- Clone: `D:\code\aiagent\0824_langchain\frontend\.git`
-- Replace: `README.md`
-- Create through scaffolding: `package.json`, `package-lock.json`, `tsconfig.json`, `next.config.ts`, `eslint.config.mjs`, `src/app/*`
-- Create: `.env.local.example`
-- Modify: `.gitignore`
+**涉及文件：**
+- 克隆得到：`D:\code\aiagent\0824_langchain\frontend\.git`
+- 替换：`README.md`
+- 由脚手架生成：`package.json`、`package-lock.json`、`tsconfig.json`、`next.config.ts`、`eslint.config.mjs`、`src/app/*`
+- 新建：`.env.local.example`
+- 修改：`.gitignore`
 
-**Interfaces:**
-- Consumes: GitHub repository `https://github.com/yutou-ii/showcon-demo-web.git`.
-- Produces: A clean Next.js App Router TypeScript repository with CopilotKit v2 and AG-UI client dependencies.
+**输入与产出：**
+- 输入：GitHub 仓库 `https://github.com/yutou-ii/showcon-demo-web.git`。
+- 产出：一个使用 Next.js App Router 和 TypeScript 的干净前端仓库，并安装 CopilotKit v2 与 AG-UI client 依赖。
 
-- [ ] **Step 1: Clone the existing frontend repository**
+- [ ] **步骤 1：克隆已有的前端仓库**
 
-The current local `frontend` directory is empty. Run from `D:\code\aiagent\0824_langchain`:
+当前本地 `frontend` 目录为空。在 `D:\code\aiagent\0824_langchain` 中运行：
 
 ```powershell
 git clone https://github.com/yutou-ii/showcon-demo-web.git frontend
@@ -788,43 +803,43 @@ Set-Location frontend
 git status --short --branch
 ```
 
-Expected: branch `main` tracks `origin/main` and contains only the GitHub-generated README.
+预期结果：本地 `main` 分支跟踪 `origin/main`，仓库中只有 GitHub 自动生成的 README。
 
-- [ ] **Step 2: Replace the tracked README through normal working-tree changes**
+- [ ] **步骤 2：通过普通工作区修改覆盖已跟踪的 README**
 
 ```powershell
 Remove-Item -LiteralPath README.md
 npx.cmd create-next-app@16.3.0 . --typescript --eslint --app --src-dir --use-npm --no-tailwind --no-agents-md --import-alias "@/*" --yes
 ```
 
-Expected: create-next-app ignores the existing `.git` directory when checking for conflicting files, preserves it, and writes a new README plus the application scaffold. `--no-agents-md` prevents unrelated generated agent instructions. Do not run `git init` and do not force-push.
+预期结果：create-next-app 在检查冲突文件时忽略并保留已有的 `.git` 目录，同时写入新的 README 和应用脚手架。`--no-agents-md` 用于避免生成与项目无关的 Agent 说明。不要运行 `git init`，也不要强制推送。
 
-- [ ] **Step 3: Install the frontend agent dependencies**
+- [ ] **步骤 3：安装前端 Agent 相关依赖**
 
 ```powershell
 npm.cmd install @copilotkit/react-core@1.66.2 @copilotkit/runtime@1.66.2 @ag-ui/client@0.0.57 lucide-react@1.28.0
 ```
 
-Commit the generated `package-lock.json`; it is the exact dependency lock for the project.
+必须提交生成的 `package-lock.json`，它记录了项目实际安装的精确依赖版本。
 
-- [ ] **Step 4: Add the server-side agent URL example**
+- [ ] **步骤 4：添加服务端 Agent 地址示例**
 
-Create `.env.local.example`:
+新建 `.env.local.example`：
 
 ```dotenv
 AGENT_URL=http://127.0.0.1:8000/agent
 ```
 
-Ensure `.gitignore` contains:
+确认 `.gitignore` 包含：
 
 ```gitignore
 .env*
 !.env.local.example
 ```
 
-Copy the example to `.env.local` for local use; `.env.local` remains ignored.
+把示例复制为本地使用的 `.env.local`；`.env.local` 必须继续被 Git 忽略。
 
-- [ ] **Step 5: Verify and commit the untouched scaffold**
+- [ ] **步骤 5：验证并提交尚未加入业务代码的脚手架**
 
 ```powershell
 npm.cmd run lint
@@ -833,23 +848,23 @@ git add .
 git commit -m "build: scaffold CopilotKit frontend"
 ```
 
-Expected: lint and production build pass before CopilotKit code is added.
+预期结果：在添加 CopilotKit 业务代码之前，代码检查和生产构建都通过。这样后续出现问题时，更容易判断是脚手架问题还是新增代码问题。
 
 ---
 
-### Task 7: Add the v2 CopilotKit Runtime Proxy
+### 任务 7：添加 CopilotKit v2 Runtime 代理
 
-**Files:**
-- Create: `src/app/api/copilotkit/[...path]/route.ts`
-- Use: `.env.local`
+**涉及文件：**
+- 新建：`src/app/api/copilotkit/[...path]/route.ts`
+- 使用：`.env.local`
 
-**Interfaces:**
-- Consumes: `AGENT_URL`, defaulting to `http://127.0.0.1:8000/agent`.
-- Produces: `GET` and `POST` handlers under `/api/copilotkit/*`, registering `local_chat` as an AG-UI `HttpAgent`.
+**输入与产出：**
+- 输入：`AGENT_URL`；未配置时默认使用 `http://127.0.0.1:8000/agent`。
+- 产出：`/api/copilotkit/*` 下的 `GET` 和 `POST` 处理函数，并把 `local_chat` 注册为 AG-UI `HttpAgent`。
 
-- [ ] **Step 1: Create the catch-all Runtime route**
+- [ ] **步骤 1：创建 Runtime 通配路由**
 
-Create `src/app/api/copilotkit/[...path]/route.ts`:
+新建 `src/app/api/copilotkit/[...path]/route.ts`：
 
 ```typescript
 import { HttpAgent } from "@ag-ui/client";
@@ -874,32 +889,32 @@ const handler = createCopilotRuntimeHandler({
 export { handler as GET, handler as POST };
 ```
 
-- [ ] **Step 2: Run static verification**
+- [ ] **步骤 2：进行静态检查**
 
 ```powershell
 npm.cmd run lint
 npm.cmd run build
 ```
 
-Expected: no TypeScript, ESLint, or route build errors.
+预期结果：没有 TypeScript、ESLint 或路由构建错误。
 
-- [ ] **Step 3: Probe agent discovery with both servers running**
+- [ ] **步骤 3：同时运行两个服务，检查 Agent 发现接口**
 
-Keep the Python service from Task 5 running. In the VS Code terminal run:
+保持任务 5 的 Python 服务运行，在 VS Code 终端中运行：
 
 ```powershell
 npm.cmd run dev
 ```
 
-In another terminal run:
+在另一个终端中运行：
 
 ```powershell
 Invoke-RestMethod http://localhost:3000/api/copilotkit/info
 ```
 
-Expected: the response lists an agent with ID `local_chat`. If it does not, compare the installed runtime's `/info` response with the official v2 Runtime HTTP endpoints documentation before changing any other layer.
+预期结果：响应中列出 ID 为 `local_chat` 的 Agent。如果没有，先对照已安装 Runtime 的 `/info` 响应和官方 v2 Runtime HTTP endpoints 文档，不要急着修改其他层。这个检查专门验证 Next.js Runtime 是否正确注册了 Python Agent。
 
-- [ ] **Step 4: Commit the Runtime route**
+- [ ] **步骤 4：提交 Runtime 路由**
 
 ```powershell
 git add src\app\api\copilotkit .env.local.example .gitignore package.json package-lock.json
@@ -908,20 +923,20 @@ git commit -m "feat: connect runtime to Python chat agent"
 
 ---
 
-### Task 8: Build the CopilotChat Page and New-Chat Control
+### 任务 8：构建 CopilotChat 页面和新建对话按钮
 
-**Files:**
-- Modify: `src/app/layout.tsx`
-- Replace: `src/app/page.tsx`
-- Replace: `src/app/globals.css`
+**涉及文件：**
+- 修改：`src/app/layout.tsx`
+- 替换：`src/app/page.tsx`
+- 替换：`src/app/globals.css`
 
-**Interfaces:**
-- Consumes: Runtime `/api/copilotkit` and agent ID `local_chat`.
-- Produces: A responsive full-page chat UI; `startNewThread()` clears visible history and causes the next run to use a new LangGraph thread ID.
+**输入与产出：**
+- 输入：Runtime 地址 `/api/copilotkit` 和 Agent ID `local_chat`。
+- 产出：一个响应式全页面聊天界面；`startNewThread()` 清空当前可见消息，并让下一次请求使用新的 LangGraph `thread_id`。
 
-- [ ] **Step 1: Replace the page with the CopilotKit provider and chat**
+- [ ] **步骤 1：使用 CopilotKit Provider 和聊天组件替换页面**
 
-Create `src/app/page.tsx`:
+创建 `src/app/page.tsx`：
 
 ```tsx
 "use client";
@@ -981,9 +996,9 @@ export default function Home() {
 }
 ```
 
-- [ ] **Step 2: Set page metadata and language**
+- [ ] **步骤 2：设置页面元数据和语言**
 
-Replace `src/app/layout.tsx` with:
+把 `src/app/layout.tsx` 替换为：
 
 ```tsx
 import type { Metadata } from "next";
@@ -1009,9 +1024,9 @@ export default function RootLayout({
 }
 ```
 
-- [ ] **Step 3: Add a restrained responsive layout**
+- [ ] **步骤 3：添加简洁的响应式布局**
 
-Replace `src/app/globals.css` with:
+把 `src/app/globals.css` 替换为：
 
 ```css
 :root {
@@ -1127,25 +1142,25 @@ input {
 }
 ```
 
-- [ ] **Step 4: Verify the frontend statically**
+- [ ] **步骤 4：进行前端静态检查**
 
 ```powershell
 npm.cmd run lint
 npm.cmd run build
 ```
 
-Expected: both commands pass. CopilotKit's prebuilt component supplies the sending/loading/error states; the custom button only starts a new thread.
+预期结果：两个命令都通过。CopilotKit 的预制组件负责发送中、加载中和错误状态；自定义按钮只负责开始新会话。
 
-- [ ] **Step 5: Verify the page manually on desktop and mobile widths**
+- [ ] **步骤 5：在桌面和手机宽度下手动检查页面**
 
-With both dev servers running, open `http://localhost:3000` and check:
+保持前后端开发服务运行，打开 `http://localhost:3000` 并检查：
 
 ```text
-Desktop 1440x900: header and chat fit without overlap or horizontal scrolling.
-Mobile 390x844: title, reset icon, messages, and composer remain visible and usable.
+桌面端 1440x900：页头和聊天区域没有重叠，也没有水平滚动条。
+移动端 390x844：标题、重置图标、消息和输入框都保持可见并且可以操作。
 ```
 
-- [ ] **Step 6: Commit the chat page**
+- [ ] **步骤 6：提交聊天页面**
 
 ```powershell
 git add src\app\layout.tsx src\app\page.tsx src\app\globals.css
@@ -1154,70 +1169,70 @@ git commit -m "feat: add streaming CopilotKit chat page"
 
 ---
 
-### Task 9: Complete End-to-End Acceptance and Repository Documentation
+### 任务 9：完成端到端验收和仓库文档
 
-**Files:**
-- Replace in backend: `README.md`
-- Replace in frontend: `README.md`
+**涉及文件：**
+- 在后端仓库替换：`README.md`
+- 在前端仓库替换：`README.md`
 
-**Interfaces:**
-- Consumes: Completed backend and frontend services.
-- Produces: Reproducible setup instructions and evidence for every phase-one acceptance criterion.
+**输入与产出：**
+- 输入：已经完成的后端服务和前端应用。
+- 产出：其他人可以重复执行的安装说明，以及覆盖第一阶段每项验收标准的验证记录。
 
-- [ ] **Step 1: Run all automated backend checks**
+- [ ] **步骤 1：运行全部后端自动化检查**
 
-From `backend`:
+在 `backend` 目录运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected: configuration, model factory, graph memory, health, CORS, and AG-UI stream tests all pass without real API usage.
+预期结果：配置、模型工厂、图记忆、健康检查、CORS 和 AG-UI 流式响应测试全部通过，而且不调用真实模型接口。
 
-- [ ] **Step 2: Run all automated frontend checks**
+- [ ] **步骤 2：运行全部前端自动化检查**
 
-From `frontend`:
+在 `frontend` 目录运行：
 
 ```powershell
 npm.cmd run lint
 npm.cmd run build
 ```
 
-Expected: both pass.
+预期结果：代码检查和生产构建都通过。
 
-- [ ] **Step 3: Perform the real-model conversation acceptance test**
+- [ ] **步骤 3：使用真实模型完成对话验收**
 
-Start the backend in PyCharm and frontend in VS Code, then perform exactly this sequence:
+在 PyCharm 中启动后端，在 VS Code 中启动前端，然后严格按以下顺序操作：
 
 ```text
-1. Send: 你好，请记住我的名字叫小羽。
-2. Confirm the answer appears incrementally rather than all at once.
-3. Send: 我的名字是什么？
-4. Confirm the answer says 小羽.
-5. Click the reset icon.
-6. Send: 我的名字是什么？
-7. Confirm the new conversation does not know the old name.
+1. 发送：你好，请记住我的名字叫小羽。
+2. 确认回答逐段出现，而不是等待结束后一次性显示。
+3. 发送：我的名字是什么？
+4. 确认回答中包含“小羽”。
+5. 单击重置图标。
+6. 再次发送：我的名字是什么？
+7. 确认新会话不知道旧会话中的名字。
 ```
 
-- [ ] **Step 4: Perform failure and recovery acceptance**
+- [ ] **步骤 4：完成故障和恢复验收**
 
-Stop the Python server while keeping the page open. Send a message and confirm CopilotChat ends the loading state and shows a comprehensible run/connection error. Restart Python and confirm a new message succeeds without reloading the entire development environment.
+保持页面打开，但停止 Python 服务。发送消息，确认 CopilotChat 能结束加载状态，并显示可以理解的运行或连接错误。重新启动 Python，再发送一条消息，确认不必重启整个开发环境就能恢复对话。
 
-- [ ] **Step 5: Write the backend README**
+- [ ] **步骤 5：编写后端 README**
 
-The backend README must contain these sections with exact commands:
+后端 README 必须包含以下章节和准确命令：
 
 ~~~~markdown
 # showcon-demo-langchain
 
-Python backend for the phase-one local chat agent.
+第一阶段本地对话智能体的 Python 后端。
 
-## Requirements
+## 环境要求
 
 - Python 3.12
-- A company OpenAI-compatible API key, base URL, and model name
+- 公司 OpenAI 兼容接口的 API Key、Base URL 和模型名称
 
-## Setup
+## 安装与启动
 
 ```powershell
 python -m venv .venv
@@ -1225,17 +1240,17 @@ python -m venv .venv
 Copy-Item .env.example .env
 ```
 
-Set the three real company values in `.env`, then start:
+在 `.env` 中填写公司提供的三个真实值，然后启动服务：
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Health: `http://127.0.0.1:8000/health`
+健康检查：`http://127.0.0.1:8000/health`
 
-## Learning Examples
+## 学习示例
 
-Run the examples in learning order:
+按照学习顺序运行示例：
 
 ```powershell
 .\.venv\Scripts\python.exe examples\01_model_call.py
@@ -1243,32 +1258,32 @@ Run the examples in learning order:
 .\.venv\Scripts\python.exe examples\03_minimal_graph.py
 ```
 
-## Tests
+## 测试
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-## Architecture
+## 架构
 
-See `docs/superpowers/specs/2026-08-05-local-chat-agent-design.md`.
+参见 `docs/superpowers/specs/2026-08-05-local-chat-agent-design.md`。
 ~~~~
 
-- [ ] **Step 6: Write the frontend README**
+- [ ] **步骤 6：编写前端 README**
 
-The frontend README must contain:
+前端 README 必须包含：
 
 ~~~~markdown
 # showcon-demo-web
 
-Next.js and CopilotKit frontend for the phase-one local chat agent.
+第一阶段本地对话智能体的 Next.js 和 CopilotKit 前端。
 
-## Requirements
+## 环境要求
 
 - Node.js 20+
-- The Python backend running on port 8000
+- 已经在 8000 端口运行的 Python 后端
 
-## Setup
+## 安装与启动
 
 ```powershell
 npm.cmd install
@@ -1276,56 +1291,56 @@ Copy-Item .env.local.example .env.local
 npm.cmd run dev
 ```
 
-Open `http://localhost:3000`.
+打开 `http://localhost:3000`。
 
-## Checks
+## 检查
 
 ```powershell
 npm.cmd run lint
 npm.cmd run build
 ```
 
-## Architecture
+## 架构
 
-The browser calls `/api/copilotkit`; the server-side Runtime forwards `local_chat` runs to the Python AG-UI endpoint configured by `AGENT_URL`. No model API key belongs in this repository.
+浏览器调用 `/api/copilotkit`；服务端 Runtime 把 `local_chat` 的运行请求转发到 `AGENT_URL` 配置的 Python AG-UI 地址。模型 API Key 不应出现在本仓库中。
 
-See the [phase-one design](https://github.com/yutou-ii/showcon-demo-langchain/blob/main/docs/superpowers/specs/2026-08-05-local-chat-agent-design.md) in the backend repository.
+参见后端仓库中的[第一阶段设计文档](https://github.com/yutou-ii/showcon-demo-langchain/blob/main/docs/superpowers/specs/2026-08-05-local-chat-agent-design.md)。
 ~~~~
 
-- [ ] **Step 7: Check both repositories for ignored secrets and IDE files**
+- [ ] **步骤 7：检查两个仓库是否错误跟踪了秘密或 IDE 文件**
 
-Run in each repository:
+分别在两个仓库中运行：
 
 ```powershell
 git status --short
 git ls-files | rg "(^|/)(\.env|\.idea|\.vscode|\.venv)(/|$)"
 ```
 
-Expected: `.env`, `.env.local`, `.idea/`, `.vscode/`, and `.venv/` do not appear. Only `.env.example` and `.env.local.example` may be tracked.
+预期结果：输出中不出现 `.env`、`.env.local`、`.idea/`、`.vscode/` 和 `.venv/`。只有 `.env.example` 和 `.env.local.example` 可以被 Git 跟踪。
 
-- [ ] **Step 8: Commit documentation separately in each repository**
+- [ ] **步骤 8：在两个仓库中分别提交文档**
 
-Backend:
+后端仓库：
 
 ```powershell
 git add README.md
 git commit -m "docs: add backend setup and verification guide"
 ```
 
-Frontend:
+前端仓库：
 
 ```powershell
 git add README.md
 git commit -m "docs: add frontend setup and verification guide"
 ```
 
-- [ ] **Step 9: Record final local status without pushing**
+- [ ] **步骤 9：记录最终本地状态，但暂不推送**
 
-Run in both repositories:
+分别在两个仓库中运行：
 
 ```powershell
 git status --short --branch
 git log --oneline -8
 ```
 
-Expected: both worktrees are clean. Review commits and test results with the mentor before pushing either `main` branch.
+预期结果：两个工作区都干净。先与带教一起检查提交记录和测试结果，再决定是否推送两个仓库的 `main` 分支。
