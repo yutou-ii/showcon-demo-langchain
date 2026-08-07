@@ -605,7 +605,7 @@ if __name__ == "__main__":
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
-git add app\agent.py examples\03_minimal_graph.py tests\test_agent.py
+
 git commit -m "feat: add minimal stateful LangGraph agent"
 ```
 
