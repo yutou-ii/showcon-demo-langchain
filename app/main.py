@@ -26,15 +26,6 @@ def create_app(model: BaseChatModel | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    fastapi_app = FastAPI(title="Local Chat Agent")
-    fastapi_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["*"],
-    )
-
     @fastapi_app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
