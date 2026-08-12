@@ -20,7 +20,7 @@ def create_app(model: BaseChatModel | None = None) -> FastAPI:
     fastapi_app = FastAPI(title="Local Chat Agent")
     fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
@@ -35,3 +35,9 @@ def create_app(model: BaseChatModel | None = None) -> FastAPI:
     return fastapi_app
 
 app = create_app()
+
+# 需要断点调试直接用pycharm的debugger模式
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)

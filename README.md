@@ -14,14 +14,13 @@
 
 ## 安装依赖
 
-在本仓库根目录执行：
+需要先安装 [uv](https://docs.astral.sh/uv/)。在本仓库根目录执行：
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+uv sync
 ```
 
-如果已经在 PyCharm 中创建过虚拟环境，并且路径是 `.venv`，可以只执行安装依赖命令。
+uv 会自动创建 `.venv` 虚拟环境并安装全部依赖（含开发依赖）。后续依赖变更后再次执行 `uv sync` 即可同步。
 
 ## 配置环境变量
 
@@ -43,19 +42,10 @@ OPENAI_MODEL=your-model-name
 
 ## 启动服务
 
-在 PyCharm 中可以使用以下运行配置：
-
-```text
-Module name: uvicorn
-Parameters: app.main:app --host 127.0.0.1 --port 8000 --reload
-Working directory: D:\code\aiagent\0824_langchain\backend
-Interpreter: D:\code\aiagent\0824_langchain\backend\.venv\Scripts\python.exe
-```
-
-也可以在终端运行：
+在终端运行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 启动后检查：
@@ -72,9 +62,9 @@ Invoke-RestMethod http://127.0.0.1:8000/agent/health
 按顺序运行：
 
 ```powershell
-.\.venv\Scripts\python.exe examples\01_model_call.py
-.\.venv\Scripts\python.exe examples\02_stream_chat.py
-.\.venv\Scripts\python.exe examples\03_minimal_graph.py
+uv run examples\01_model_call.py
+uv run examples\02_stream_chat.py
+uv run examples\03_minimal_graph.py
 ```
 
 三个示例分别用于理解：
@@ -88,7 +78,7 @@ Invoke-RestMethod http://127.0.0.1:8000/agent/health
 运行全部后端测试：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+uv run -m pytest -q
 ```
 
 这些测试使用假模型或本地配置校验，不会消耗公司模型接口额度。
