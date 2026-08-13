@@ -212,17 +212,17 @@ skills/
 - 安全解析 Skill 内声明的相对 reference 路径，禁止 `..` 越出 Skill 根目录。
 - 缓存不含用户合同内容的静态 Skill 文本。
 
-第一版的触发策略保持确定性：当用户明确要求“解释、什么意思、看不懂、用大白话讲、解读”等，并且工具已返回法律术语或合同条款时，加载 `legal-plain-explanation`。输入属于合同领域，因此只加载 `references/contract-terms.md`；其他三个领域资料不自动加载。
+Agent 启动时只把全部已登记 Skill 的 `name` 和 `description` 组成简短目录放入系统提示，让模型粗略知道“有哪些技能可以使用”，但不预先加载所有 Skill 正文。用户问题命中某个技能时，模型调用受限工具 `read_skill_file(skill_name, relative_path)`：先读取该 Skill 的 `SKILL.md`，再依据其中的按需加载规则读取必要 reference。合同条款问题只读取 `references/contract-terms.md`，其他三个领域资料不自动读取。
 
-Skill 不作为可被模型任意调用的文件读取工具。Agent 节点在满足触发条件后由应用代码加载已登记的 Skill，拼入本轮系统指令。这可以避免模型读取任意本地文件，也便于测试“是否只加载命中的参考资料”。
+`read_skill_file` 不是通用电脑文件读取工具。它只能接受 Registry 已登记的 `skill_name`，并且只能读取该 Skill 根目录内的 `SKILL.md` 或 `references/` 文件；绝对路径、`..` 路径穿越、未登记 Skill 和目录外文件全部拒绝。工具读取到的 Skill 内容作为 `ToolMessage` 回到模型上下文，由模型依照规则继续执行。这既符合带教提出的渐进式 Skill 加载方式，也避免模型读取任意本地文件。
 
 ### 5.8 模型提示组合
 
 模型节点根据本轮状态组合三类指令：
 
-1. 基础助手指令：说明可以普通对话，也可以对当前合同执行只读查询。
+1. 基础助手指令：说明可以普通对话，也可以对当前合同执行只读查询，并附已登记 Skill 的名称和描述目录。
 2. 工具使用指令：涉及上传合同中的具体条款时，必须先调用工具取得原文；没有证据不得解释为合同原文。
-3. Skill 指令：只有进入条款解释任务后才附加完整 Skill 正文和 `contract-terms.md`。
+3. Skill 使用指令：命中技能时先调用 `read_skill_file` 读取 `SKILL.md`，再按该文件的说明按需读取 reference；不得跳过 Skill 直接凭模型常识生成受约束的业务回答。
 
 最终回答必须遵循公司 Skill：
 
@@ -262,7 +262,7 @@ Skill 不作为可被模型任意调用的文件读取工具。Agent 节点在�
 2. CopilotKit 将消息和当前合同 Context 发送至 AG-UI。
 3. Agent 判断问题涉及当前合同条款，发起目录或定位工具调用。
 4. 工具从运行上下文读取 `document_id`，从 DocumentStore 读取合同并返回原文证据。
-5. 应用识别为合同条款解释任务，只加载法律通俗解释 Skill 和合同参考资料。
+5. 模型根据预加载的 Skill 目录识别法律通俗解释能力，通过 `read_skill_file` 先读取完整 Skill，再按其中规则读取合同参考资料。
 6. 模型依据证据和 Skill 输出三段式回答。
 7. AG-UI 将工具事件和文本事件流式传给 CopilotKit。
 
