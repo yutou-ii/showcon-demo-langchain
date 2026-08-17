@@ -1,8 +1,9 @@
+from pathlib import Path
 import pytest
-from pydantic import ValidationError
+
+from pydantic import SecretStr, ValidationError
 
 from app.config import Settings, get_settings
-
 
 REQUIRED_ENV = {
     "OPENAI_API_KEY": "test-key",
@@ -12,7 +13,7 @@ REQUIRED_ENV = {
 
 
 def test_settings_read_required_environment(
-    monkeypatch: pytest.MonkeyPatch,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
@@ -26,8 +27,8 @@ def test_settings_read_required_environment(
 
 @pytest.mark.parametrize("missing_name", REQUIRED_ENV)
 def test_settings_names_each_missing_variable(
-    monkeypatch: pytest.MonkeyPatch,
-    missing_name: str,
+        monkeypatch: pytest.MonkeyPatch,
+        missing_name: str,
 ) -> None:
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
@@ -38,8 +39,9 @@ def test_settings_names_each_missing_variable(
 
     assert missing_name in str(error.value)
 
+
 def test_get_settings_reuses_same_instance(
-    monkeypatch: pytest.MonkeyPatch,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
@@ -52,3 +54,14 @@ def test_get_settings_reuses_same_instance(
     assert first_settings is second_settings
 
     get_settings.cache_clear()
+
+
+def test_settings_accepts_external_skills_root() -> None:
+    settings = Settings(
+        OPENAI_API_KEY=SecretStr("test-key"),
+        OPENAI_BASE_URL="https://models.example.test/v1",
+        OPENAI_MODEL="test-model",
+        SKILLS_ROOT="D:/company/skills",
+    )
+
+    assert settings.skills_root == Path("D:/company/skills")

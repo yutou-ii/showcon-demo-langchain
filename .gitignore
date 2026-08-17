@@ -22,3 +22,8 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# Local contract inputs
+uploads/
+local-contracts/
+*.docx
