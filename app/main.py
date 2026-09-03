@@ -8,16 +8,25 @@ from app.model import create_chat_model
 
 from app.documents.router import create_documents_router
 from app.documents.store import DocumentStore, InMemoryDocumentStore
+from app.config import get_settings
+from app.skills.registry import SkillRegistry
 
 AGENT_ID = "local_chat"
 
 def create_app(
         model: BaseChatModel | None = None,
         document_store: DocumentStore | None = None,
+        skill_registry: SkillRegistry | None = None
 ) -> FastAPI:
-    resolved_model = model or create_chat_model()
+    settings = get_settings()
+    resolved_model = model or create_chat_model(settings)
     resolved_store = document_store or InMemoryDocumentStore()
-    graph = build_chat_graph(resolved_model)
+    resolved_registry = skill_registry or SkillRegistry(settings.skills_root)
+    graph = build_chat_graph(
+        resolved_model,
+        resolved_store,
+        resolved_registry,
+    )
     agent = LangGraphAgent(
         name=AGENT_ID,
         description="A local streaming chat agent.",

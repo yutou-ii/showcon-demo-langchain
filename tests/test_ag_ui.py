@@ -1,10 +1,16 @@
 from fastapi.testclient import TestClient
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from tests.fakes import BindableFakeListChatModel
 
 from app.main import create_app
+from app.documents.store import InMemoryDocumentStore
+from app.skills.registry import SkillRegistry
 
-def test_agent_endpoint_streams_ag_ui_events() -> None:
-    app=create_app(FakeListChatModel(responses=["hello"]))
+def test_agent_endpoint_streams_ag_ui_events(tmp_path) -> None:
+    app=create_app(
+        model=BindableFakeListChatModel(responses=["hello"]),
+        document_store=InMemoryDocumentStore(),
+        skill_registry=SkillRegistry(tmp_path),
+    )
     payload = {
         "threadId": "thread-test",
         "runId": "run-test",
